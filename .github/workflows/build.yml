@@ -13,14 +13,22 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup MSVC Environment and Build
+    - name: Compile Driver directly
       shell: cmd
       run: |
         call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-        msbuild src\RustReader.vcxproj /m /t:Build /p:Configuration=Release /p:Platform=x64
+        
+        set WDK_INC=C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0
+        set WDK_LIB=C:\Program Files (x86)\Windows Kits\10\Lib\10.0.22621.0
+        
+        echo --- COMPILING ---
+        cl.exe /c /GS- /Zl /I"%WDK_INC%\km" /I"%WDK_INC%\shared" /I"%WDK_INC%\ucrt" /D_WIN64 /D_WIN32_WINNT=0x0A00 src\Driver.c /Fo:Driver.obj
+        
+        echo --- LINKING ---
+        link.exe /OUT:RustReader.sys /SUBSYSTEM:NATIVE /DRIVER /ENTRY:DriverEntry /MACHINE:X64 /NODEFAULTLIB Driver.obj "%WDK_LIB%\km\x64\ntoskrnl.lib" "%WDK_LIB%\km\x64\hal.lib" "%WDK_LIB%\km\x64\BufferOverflowK.lib"
 
     - name: Upload built driver
       uses: actions/upload-artifact@v4
       with:
         name: RustReader-Driver
-        path: src\x64\Release\RustReader.sys
+        path: RustReader.sys
