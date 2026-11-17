@@ -1,0 +1,31 @@
+name: Build Windows Driver
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2025-vs2026
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Restore NuGet packages (WDK)
+      run: nuget restore src\RustReader.vcxproj
+
+    - name: Build Driver with MSBuild
+      run: msbuild src\RustReader.vcxproj /m /t:Build /p:Configuration=Release /p:Platform=x64
+
+    - name: Upload built driver
+      uses: actions/upload-artifact@v4
+      with:
+        name: RustReader-Driver
+        path: src\x64\Release\RustReader.sys
