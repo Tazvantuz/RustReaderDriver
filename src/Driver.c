@@ -19,7 +19,6 @@ typedef struct _PEB_REQUEST {
 } PEB_REQUEST, *PPEB_REQUEST;
 
 DRIVER_INITIALIZE DriverEntry;
-DRIVER_UNLOAD     DriverUnload;
 NTSTATUS DispatchCreateClose(PDEVICE_OBJECT, PIRP);
 NTSTATUS DispatchDeviceControl(PDEVICE_OBJECT, PIRP);
 NTSTATUS ReadProcessMemory(ULONG, PVOID, PVOID, SIZE_T);
@@ -45,17 +44,11 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath) 
     DriverObject->MajorFunction[IRP_MJ_CREATE]         = DispatchCreateClose;
     DriverObject->MajorFunction[IRP_MJ_CLOSE]          = DispatchCreateClose;
     DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = DispatchDeviceControl;
-    DriverObject->DriverUnload                         = DriverUnload;
+    
+    // DriverUnload УБРАН. Мапперам нельзя назначать выгрузку.
 
     DbgPrint("[RustReader] loaded.\n");
     return STATUS_SUCCESS;
-}
-
-VOID DriverUnload(PDRIVER_OBJECT DriverObject) {
-    UNICODE_STRING SymLink;
-    RtlInitUnicodeString(&SymLink, SYMBOLIC_LINK);
-    IoDeleteSymbolicLink(&SymLink);
-    IoDeleteDevice(DriverObject->DeviceObject);
 }
 
 NTSTATUS DispatchCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
@@ -109,7 +102,6 @@ NTSTATUS ReadProcessMemory(ULONG ProcessId, PVOID Address, PVOID Buffer, SIZE_T 
     NTSTATUS status = PsLookupProcessByProcessId(ULongToHandle(ProcessId), &Process);
     if (!NT_SUCCESS(status)) return status;
 
-    // MmCopyVirtualMemory сам переключает контекст, KeStackAttachProcess не нужен.
     status = MmCopyVirtualMemory(Process, Address,
                                  PsGetCurrentProcess(), Buffer,
                                  Size, KernelMode, NULL);
