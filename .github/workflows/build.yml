@@ -3,13 +3,11 @@ name: Build Windows Driver
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-2025-vs2026
+    runs-on: windows-latest
 
     steps:
     - name: Checkout code
@@ -17,9 +15,6 @@ jobs:
 
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
-
-    - name: Restore NuGet packages (WDK)
-      run: nuget restore src\RustReader.vcxproj
 
     - name: Build Driver with MSBuild
       run: msbuild src\RustReader.vcxproj /m /t:Build /p:Configuration=Release /p:Platform=x64
