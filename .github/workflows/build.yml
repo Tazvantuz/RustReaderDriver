@@ -16,24 +16,30 @@ jobs:
     - name: Compile and Link Driver
       shell: pwsh
       run: |
-        # Ищем установленный WDK
-        $ntddk = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\Include" -Filter "ntddk.h" -Recurse | Select-Object -First 1
-        if (-not $ntddk) { Write-Error "WDK not found"; exit 1 }
-        
+        # Автоматически ищем установленный WDK
+        $ntddk = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\Include" -Filter "ntddk.h" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (-not $ntddk) {
+            Write-Error "ntddk.h not found. WDK is not installed."
+            exit 1
+        }
         $ver = $ntddk.Directory.Parent.Name
         $wdkInc = "C:\Program Files (x86)\Windows Kits\10\Include\$ver"
         $wdkLib = "C:\Program Files (x86)\Windows Kits\10\Lib\$ver"
         Write-Host "Using WDK version: $ver"
-        
+
         # Проверяем наличие библиотеки защиты буфера
+        $bufPath = ""
         $buf = Get-ChildItem -Path "$wdkLib\km\x64" -Filter "BufferOverflowK.lib" -ErrorAction SilentlyContinue
-        if ($buf) { $bufPath = $buf.FullName } else { $bufPath = "" }
+        if ($buf) { $bufPath = $buf.FullName }
+
+        # Компиляция: добавляем _AMD64_ и _M_X64 для правильной архитектуры
+        $compileCmd = "cl.exe /c /GS- /Zl /D_AMD64_ /D_M_X64 /D_WIN64 /D_WIN32_WINNT=0x0A00 /I`"$wdkInc\km`" /I`"$wdkInc\shared`" /I`"$wdkInc\ucrt`" src\Driver.c /Fo:Driver.obj"
         
-        # Команды компиляции и линковки
-        $compileCmd = "cl.exe /c /GS- /Zl /I`"$wdkInc\km`" /I`"$wdkInc\shared`" /I`"$wdkInc\ucrt`" /D_WIN64 /D_WIN32_WINNT=0x0A00 src\Driver.c /Fo:Driver.obj"
-        $linkCmd = "link.exe /OUT:RustReader.sys /SUBSYSTEM:NATIVE /DRIVER /ENTRY:DriverEntry /MACHINE:X64 /NODEFAULTLIB Driver.obj `"$wdkLib\km\x64\ntoskrnl.lib`" `"$wdkLib\km\x64\hal.lib`" `"$bufPath`""
-        
-        # Запускаем всё через окружение Visual Studio
+        # Линковка: стандартные библиотеки ядра
+        $linkCmd = "link.exe /OUT:RustReader.sys /SUBSYSTEM:NATIVE /DRIVER /ENTRY:DriverEntry /MACHINE:X64 /NODEFAULTLIB Driver.obj `"$wdkLib\km\x64\ntoskrnl.lib`" `"$wdkLib\km\x64\hal.lib`""
+        if ($bufPath) { $linkCmd += " `"$bufPath`"" }
+
+        # Запуск в окружении Visual Studio
         cmd /c "`"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat`" && $compileCmd && $linkCmd"
 
     - name: Upload built driver
