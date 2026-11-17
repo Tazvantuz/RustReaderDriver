@@ -1,10 +1,10 @@
 #include <ntddk.h>
 
-#define DEVICE_NAME  L"\\Device\\RustReader"
-#define SYMBOLIC_LINK L"\\DosDevices\\RustReader"
+#define DEVICE_NAME  L"\\Device\\NullSvc"
+#define SYMBOLIC_LINK L"\\DosDevices\\NullSvc"
 
-#define IOCTL_READ_MEMORY  CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_BUFFERED, FILE_SPECIAL_ACCESS)
-#define IOCTL_GET_PEB      CTL_CODE(FILE_DEVICE_UNKNOWN, 0x801, METHOD_BUFFERED, FILE_SPECIAL_ACCESS)
+#define IOCTL_READ_MEMORY  CTL_CODE(FILE_DEVICE_UNKNOWN, 0x9C3, METHOD_BUFFERED, FILE_SPECIAL_ACCESS)
+#define IOCTL_GET_PEB      CTL_CODE(FILE_DEVICE_UNKNOWN, 0x9C7, METHOD_BUFFERED, FILE_SPECIAL_ACCESS)
 
 typedef struct _READ_REQUEST {
     ULONG  ProcessId;
@@ -44,10 +44,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath) 
     DriverObject->MajorFunction[IRP_MJ_CREATE]         = DispatchCreateClose;
     DriverObject->MajorFunction[IRP_MJ_CLOSE]          = DispatchCreateClose;
     DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = DispatchDeviceControl;
-    
-    // DriverUnload УБРАН. Мапперам нельзя назначать выгрузку.
 
-    DbgPrint("[RustReader] loaded.\n");
     return STATUS_SUCCESS;
 }
 
@@ -102,9 +99,10 @@ NTSTATUS ReadProcessMemory(ULONG ProcessId, PVOID Address, PVOID Buffer, SIZE_T 
     NTSTATUS status = PsLookupProcessByProcessId(ULongToHandle(ProcessId), &Process);
     if (!NT_SUCCESS(status)) return status;
 
+    // ИСПРАВЛЕНО: UserMode вместо KernelMode
     status = MmCopyVirtualMemory(Process, Address,
                                  PsGetCurrentProcess(), Buffer,
-                                 Size, KernelMode, NULL);
+                                 Size, UserMode, NULL);
 
     ObDereferenceObject(Process);
     return status;
