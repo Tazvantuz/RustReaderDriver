@@ -20,9 +20,7 @@
     <UseDebugLibraries>false</UseDebugLibraries>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <ImportGroup Label="PropertySheets">
-    <Import Project="$(VCTargetsPath)\Microsoft.Cpp.WindowsDriver.props" />
-  </ImportGroup>
+  <Import Project="$(WDKContentRoot)\build\WindowsDriver.props" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
@@ -33,4 +31,5 @@
     <ClCompile Include="Driver.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="$(WDKContentRoot)\build\WindowsDriver.targets" />
 </Project>
