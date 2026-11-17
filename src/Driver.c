@@ -1,4 +1,3 @@
-#include <ntifs.h>
 #include <ntddk.h>
 
 #define DEVICE_NAME  L"\\Device\\RustReader"
@@ -38,7 +37,10 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath) 
 
     RtlInitUnicodeString(&SymLink, SYMBOLIC_LINK);
     status = IoCreateSymbolicLink(&SymLink, &DeviceName);
-    if (!NT_SUCCESS(status)) { IoDeleteDevice(DeviceObject); return status; }
+    if (!NT_SUCCESS(status)) { 
+        IoDeleteDevice(DeviceObject); 
+        return status; 
+    }
 
     DriverObject->MajorFunction[IRP_MJ_CREATE]         = DispatchCreateClose;
     DriverObject->MajorFunction[IRP_MJ_CLOSE]          = DispatchCreateClose;
@@ -75,7 +77,9 @@ NTSTATUS DispatchDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
         if (stack->Parameters.DeviceIoControl.InputBufferLength >= sizeof(READ_REQUEST)) {
             PREAD_REQUEST req = (PREAD_REQUEST)Irp->AssociatedIrp.SystemBuffer;
             status = ReadProcessMemory(req->ProcessId, req->Address, req->Buffer, req->Size);
-            if (NT_SUCCESS(status)) bytesIO = (ULONG)req->Size;
+            if (NT_SUCCESS(status)) {
+                bytesIO = (ULONG)req->Size;
+            }
         } else {
             status = STATUS_BUFFER_TOO_SMALL;
         }
@@ -105,6 +109,7 @@ NTSTATUS ReadProcessMemory(ULONG ProcessId, PVOID Address, PVOID Buffer, SIZE_T 
     NTSTATUS status = PsLookupProcessByProcessId(ULongToHandle(ProcessId), &Process);
     if (!NT_SUCCESS(status)) return status;
 
+    // MmCopyVirtualMemory сам переключает контекст, KeStackAttachProcess не нужен.
     status = MmCopyVirtualMemory(Process, Address,
                                  PsGetCurrentProcess(), Buffer,
                                  Size, KernelMode, NULL);
