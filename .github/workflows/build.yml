@@ -13,19 +13,28 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Compile Driver directly
-      shell: cmd
+    - name: Compile and Link Driver
+      shell: pwsh
       run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        # Ищем установленный WDK
+        $ntddk = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\Include" -Filter "ntddk.h" -Recurse | Select-Object -First 1
+        if (-not $ntddk) { Write-Error "WDK not found"; exit 1 }
         
-        set WDK_INC=C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0
-        set WDK_LIB=C:\Program Files (x86)\Windows Kits\10\Lib\10.0.22621.0
+        $ver = $ntddk.Directory.Parent.Name
+        $wdkInc = "C:\Program Files (x86)\Windows Kits\10\Include\$ver"
+        $wdkLib = "C:\Program Files (x86)\Windows Kits\10\Lib\$ver"
+        Write-Host "Using WDK version: $ver"
         
-        echo --- COMPILING ---
-        cl.exe /c /GS- /Zl /I"%WDK_INC%\km" /I"%WDK_INC%\shared" /I"%WDK_INC%\ucrt" /D_WIN64 /D_WIN32_WINNT=0x0A00 src\Driver.c /Fo:Driver.obj
+        # Проверяем наличие библиотеки защиты буфера
+        $buf = Get-ChildItem -Path "$wdkLib\km\x64" -Filter "BufferOverflowK.lib" -ErrorAction SilentlyContinue
+        if ($buf) { $bufPath = $buf.FullName } else { $bufPath = "" }
         
-        echo --- LINKING ---
-        link.exe /OUT:RustReader.sys /SUBSYSTEM:NATIVE /DRIVER /ENTRY:DriverEntry /MACHINE:X64 /NODEFAULTLIB Driver.obj "%WDK_LIB%\km\x64\ntoskrnl.lib" "%WDK_LIB%\km\x64\hal.lib" "%WDK_LIB%\km\x64\BufferOverflowK.lib"
+        # Команды компиляции и линковки
+        $compileCmd = "cl.exe /c /GS- /Zl /I`"$wdkInc\km`" /I`"$wdkInc\shared`" /I`"$wdkInc\ucrt`" /D_WIN64 /D_WIN32_WINNT=0x0A00 src\Driver.c /Fo:Driver.obj"
+        $linkCmd = "link.exe /OUT:RustReader.sys /SUBSYSTEM:NATIVE /DRIVER /ENTRY:DriverEntry /MACHINE:X64 /NODEFAULTLIB Driver.obj `"$wdkLib\km\x64\ntoskrnl.lib`" `"$wdkLib\km\x64\hal.lib`" `"$bufPath`""
+        
+        # Запускаем всё через окружение Visual Studio
+        cmd /c "`"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat`" && $compileCmd && $linkCmd"
 
     - name: Upload built driver
       uses: actions/upload-artifact@v4
